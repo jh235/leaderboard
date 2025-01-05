@@ -83,4 +83,4 @@ curl -X GET http://localhost:8080/v1/leaderboard/{playerId}/range/{range}
 ### 一些其他可以优化待实现的点
 - 可以考虑再加一层内存缓存,减轻Redis压力
 - 日志记录
-- ...
+- 跳表方案未实现
