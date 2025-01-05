@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package leaderboard;
+
+option go_package = "/internal/leaderboard;leaderboard";
+
+import "google/protobuf/empty.proto";
+import "google/api/annotations.proto";
+
+message RankInfo {
+  string playerId = 1; // 玩家 ID
+  int64 score = 2;     // 玩家分数
+  int32 rank = 3;      // 玩家排名
+}
+
+message UpdateScoreRequest {
+  string playerId = 1; // 玩家 ID
+  int64 score = 2;     // 玩家分数
+  int64 timestamp = 3; // 时间戳
+}
+
+message GetPlayerRankRequest {
+  string playerId = 1; // 玩家 ID
+}
+
+message GetTopNRequest {
+  int32 n = 1; // 获取的前 N 名
+}
+
+message GetPlayerRankRangeRequest {
+  string playerId = 1; // 玩家 ID
+  int32 range = 2;     // 范围大小
+}
+
+message PlayerRankRangeResponse {
+  repeated RankInfo ranks = 1; // 玩家排名
+}
+
+// 定义 Leaderboard 服务
+service LeaderboardService {
+  rpc UpdateScore(UpdateScoreRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/leaderboard/update_score"
+      body: "*"
+    };
+  }
+  rpc GetPlayerRank(GetPlayerRankRequest) returns (RankInfo) {
+    option (google.api.http) = {
+      get: "/v1/leaderboard/{playerId}/rank"
+    };
+  }
+  rpc GetTopN(GetTopNRequest) returns (PlayerRankRangeResponse) {
+  option (google.api.http) = {
+  get: "/v1/leaderboard/topN/{n}"
+      };
+  }
+  rpc GetPlayerRankRange(GetPlayerRankRangeRequest) returns (PlayerRankRangeResponse) {
+    option (google.api.http) = {
+      get: "/v1/leaderboard/{playerId}/range/{range}"
+    };
+  }
+}
