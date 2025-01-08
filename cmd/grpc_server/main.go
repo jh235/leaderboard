@@ -20,8 +20,9 @@ func runGrpcServer() {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
-	redisLeaderboard := leaderboard_impl.NewRedisLeaderboard("localhost:6379", "playerRank")
-	service := leaderboard.NewLeaderboardService(redisLeaderboard)
+	//redisLeaderboard := leaderboard_impl.NewRedisLeaderboard("localhost:6379", "playerRank")
+	redisDenseLeaderboard := leaderboard_impl.NewRedisDenseLeaderboard("localhost:6379", "playerDenseRank")
+	service := leaderboard.NewLeaderboardService(redisDenseLeaderboard)
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterLeaderboardServiceServer(grpcServer, service)

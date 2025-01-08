@@ -22,7 +22,7 @@ func main() {
 	// 测试 UpdateScore 方法
 	_, err = client.UpdateScore(context.Background(), &leaderboard.UpdateScoreRequest{
 		PlayerId:  "123",
-		Score:     100,
+		Score:     200,
 		Timestamp: time.Now().Unix(),
 	})
 	if err != nil {
@@ -30,9 +30,27 @@ func main() {
 	}
 	log.Println("Score updated successfully!")
 
+	client.UpdateScore(context.Background(), &leaderboard.UpdateScoreRequest{
+		PlayerId:  "1234",
+		Score:     100,
+		Timestamp: time.Now().Unix(),
+	})
+
+	client.UpdateScore(context.Background(), &leaderboard.UpdateScoreRequest{
+		PlayerId:  "12345",
+		Score:     100,
+		Timestamp: time.Now().Unix(),
+	})
+
+	client.UpdateScore(context.Background(), &leaderboard.UpdateScoreRequest{
+		PlayerId:  "123456",
+		Score:     90,
+		Timestamp: time.Now().Unix(),
+	})
+
 	// 测试 GetPlayerRank 方法
 	rankInfo, err := client.GetPlayerRank(context.Background(), &leaderboard.GetPlayerRankRequest{
-		PlayerId: "123",
+		PlayerId: "123456",
 	})
 	if err != nil {
 		log.Fatalf("could not get player rank: %v", err)
@@ -50,7 +68,7 @@ func main() {
 
 	// 测试 GetPlayerRankRange 方法
 	rankRangeResponse, err := client.GetPlayerRankRange(context.Background(), &leaderboard.GetPlayerRankRangeRequest{
-		PlayerId: "123",
+		PlayerId: "123456",
 		Range:    10,
 	})
 	if err != nil {
