@@ -3,13 +3,16 @@ package leaderboard_impl
 import (
 	"context"
 	"errors"
+	"fmt"
 	"game_leaderboard/internal/leaderboard"
 	"github.com/go-redis/redis/v8"
 	"strconv"
 )
 
 const (
-	playerScoreKey = "player:score"
+	playerScoreKey     = "player:score"
+	playerScoreListKey = "player:score:%d"
+	defaultPlayerId    = "score:player:%d" // 没有实际用处,就是用来计算排名
 )
 
 type RedisDenseLeaderboard struct {
@@ -43,13 +46,28 @@ func (r *RedisDenseLeaderboard) UpdateScore(ctx context.Context, playerId string
 	// 更新哈希表中的得分
 	pipe.HSet(ctx, playerScoreKey, playerId, score)
 
-	// 如果存在当前得分，则需要从有序集合中删除
-	if currentScore != 0 {
-		pipe.ZRem(ctx, r.key, playerId)
+	// 如果分数发生变化
+	if currentScore != score {
+		// 从列表中移除旧分数的用户
+		if currentScore > 0 {
+			pipe.LRem(ctx, fmt.Sprintf(playerScoreListKey, int64(currentScore)), 0, playerId)
+		}
+		// 将用户添加到新分数列表中
+		pipe.RPush(ctx, fmt.Sprintf(playerScoreListKey, int64(score)), playerId)
+	}
+
+	// 检查分数是否已存在于有序集合中
+	members, err := r.client.ZRangeByScore(ctx, r.key, &redis.ZRangeBy{Min: fmt.Sprintf("%f", score), Max: fmt.Sprintf("%f", score)}).Result()
+	if err != nil {
+		return err
+	}
+
+	if len(members) > 0 {
+		return nil
 	}
 
 	// 将新得分加入有序集合
-	pipe.ZAdd(ctx, r.key, &redis.Z{Score: score, Member: playerId})
+	pipe.ZAdd(ctx, r.key, &redis.Z{Score: score, Member: fmt.Sprintf(defaultPlayerId, int64(score))})
 
 	// 执行事务
 	_, err = pipe.Exec(ctx)
@@ -83,14 +101,14 @@ func (r *RedisDenseLeaderboard) GetTopN(ctx context.Context, n int32) ([]*leader
 	}
 
 	var ranks []*leaderboard.RankInfo
-	var rank int32
-	var lastSore float64
 	for i, member := range members {
-		if member.Score != lastSore {
-			rank = int32(i + 1)
+		playerIds, err := r.client.LRange(ctx, fmt.Sprintf(playerScoreListKey, int64(member.Score)), 0, -1).Result()
+		if err != nil {
+			continue
 		}
-		lastSore = member.Score
-		ranks = append(ranks, &leaderboard.RankInfo{PlayerId: member.Member.(string), Score: int64(member.Score), Rank: rank})
+		for _, playerId := range playerIds {
+			ranks = append(ranks, &leaderboard.RankInfo{PlayerId: playerId, Score: int64(member.Score), Rank: int32(i + 1)})
+		}
 	}
 
 	return ranks, nil
@@ -126,17 +144,19 @@ func (r *RedisDenseLeaderboard) GetPlayerRankRange(ctx context.Context, playerId
 
 	var ranks []*leaderboard.RankInfo
 	var memberRank int32
-	var lastSore float64
 	for i, member := range members {
-		if member.Score != lastSore {
-			if start == 0 {
-				memberRank = int32(rank) + int32(i+1) - int32(rank-start)
-			} else {
-				memberRank = int32(rank) - int32(i+1) - int32(rank-start)
-			}
+		playerIds, err := r.client.LRange(ctx, fmt.Sprintf(playerScoreListKey, int64(member.Score)), 0, -1).Result()
+		if err != nil {
+			continue
 		}
-		lastSore = member.Score
-		ranks = append(ranks, &leaderboard.RankInfo{PlayerId: member.Member.(string), Score: int64(member.Score), Rank: memberRank})
+		if start == 0 {
+			memberRank = int32(rank) + int32(i+1) - int32(rank-start)
+		} else {
+			memberRank = int32(rank) - int32(i+1) - int32(rank-start)
+		}
+		for _, playerId := range playerIds {
+			ranks = append(ranks, &leaderboard.RankInfo{PlayerId: playerId, Score: int64(member.Score), Rank: memberRank})
+		}
 	}
 
 	return ranks, nil
